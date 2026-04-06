@@ -5,15 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Фотоотчет Магазины</title>
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/browser-image-compression/2.0.2/browser-image-compression.min.js"></script>
+    
     <style>
         body { font-family: sans-serif; background: #f0f2f5; display: flex; justify-content: center; padding: 20px; }
         .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 100%; max-width: 450px; }
         h2 { text-align: center; color: #333; margin-bottom: 20px; }
         select, .file-btn, .send-btn { width: 100%; padding: 12px; margin-top: 10px; border-radius: 8px; border: 1px solid #ddd; font-size: 16px; box-sizing: border-box; }
         .file-btn { background: #fafafa; }
-        .send-btn { background: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; margin-top: 20px; height: 50px; }
+        .send-btn { background: #28a745; color: white; border: none; font-weight: bold; cursor: pointer; margin-top: 20px; height: 50px; }
         .send-btn:disabled { background: #ccc; }
-        .info { font-size: 12px; color: #888; text-align: center; margin-top: 10px; }
+        .info { font-size: 14px; color: #666; text-align: center; margin-top: 15px; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -24,27 +26,25 @@
     <label>Выберите магазин:</label>
     <select id="shopSelect"></select>
 
-    <div id="fileInputs">
-        </div>
+    <div id="fileInputs"></div>
 
     <button class="send-btn" id="mainBtn" onclick="sendData()">ОТПРАВИТЬ ФОТО</button>
-    <p class="info" id="statusText">Выберите магазин и 7 фотографий</p>
+    <p class="info" id="statusText">Выберите магазин и фото</p>
 </div>
 
 <script>
-    // --- НАСТРОЙКИ БАЗЫ МАГАЗИНОВ ---
+    // --- ТВОИ НАСТРОЙКИ ---
     const shops = [
         { name: "№554. Минск, Минская 7", email: "pozhitoka@dobronom.by" },
-        { name: "№123. Минск, Победителей 1", email: "engineer2@gmail.com" },
+        { name: "№123. Минск, Победителей 1", email: "andrew.pozhitok@gmail.com" },
         { name: "№777. Гродно, Советская 5", email: "boss@yandex.ru" }
     ];
 
-    // --- НАСТРОЙКИ КЛЮЧЕЙ EMAILJS ---
     const PUBLIC_KEY = "e0HfLpGlA2GRXfulJ"; 
     const SERVICE_ID = "service_o2svkwp";
     const TEMPLATE_ID = "template_xuwebhr";
 
-    // Инициализация
+    // Инициализация EmailJS
     emailjs.init(PUBLIC_KEY);
 
     // Заполнение списка магазинов
@@ -69,31 +69,54 @@
     async function sendData() {
         const btn = document.getElementById('mainBtn');
         const status = document.getElementById('statusText');
-        const files = document.querySelectorAll('input[type="file"]');
+        const fileInputs = document.querySelectorAll('.file-btn');
         
         btn.disabled = true;
-        status.innerText = "Подготовка файлов... это может занять минуту";
+        status.innerText = "Сжимаем фото... Подождите (около 10-20 сек)";
 
-        // Собираем параметры для письма
         const templateParams = {
             target_email: select.value,
             shop_name: select.options[select.selectedIndex].text,
-            // Для вложений в EmailJS файлы нужно обрабатывать отдельно, 
-            // но многие почтовики принимают их через форму FormData или встроенные механизмы.
         };
 
-        // ВАЖНО: Мы используем sendForm или передачу вложений. 
-        // В бесплатном EmailJS есть лимит на размер.
-        emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams)
-            .then(() => {
-                alert("Ура! Фото улетели инженеру.");
-                location.reload(); // Очистить страницу
-            })
-            .catch((err) => {
-                alert("Ошибка! Проверь лимиты или интернет.");
-                console.log(err);
+        let filesProcessed = 0;
+        const options = { maxSizeMB: 0.7, maxWidthOrHeight: 1280 }; // Настройки сжатия
+
+        try {
+            for (let i = 0; i < fileInputs.length; i++) {
+                if (fileInputs[i].files[0]) {
+                    // 1. Сжимаем файл
+                    const compressedFile = await imageCompression(fileInputs[i].files[0], options);
+                    
+                    // 2. Превращаем в Base64 (текстовый формат для EmailJS)
+                    const base64data = await imageCompression.getDataUrlFromFile(compressedFile);
+                    
+                    // 3. Добавляем в параметры (в шаблоне EmailJS должны быть переменные {{file0}}, {{file1}} и т.д. во вложениях)
+                    templateParams['file' + i] = base64data;
+                    filesProcessed++;
+                }
+            }
+
+            if (filesProcessed === 0) {
+                alert("Выберите хотя бы одно фото!");
                 btn.disabled = false;
-            });
+                status.innerText = "Ошибка: нет файлов";
+                return;
+            }
+
+            status.innerText = "Отправляем на почту...";
+
+            await emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams);
+            
+            alert("Ура! Все фото сжаты и отправлены инженеру.");
+            location.reload(); 
+
+        } catch (err) {
+            console.error(err);
+            alert("Ошибка! " + JSON.stringify(err));
+            btn.disabled = false;
+            status.innerText = "Произошла ошибка при отправке";
+        }
     }
 </script>
 
