@@ -7,35 +7,35 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/browser-image-compression/2.0.2/browser-image-compression.min.js"></script>
     <style>
         body { font-family: sans-serif; background: #f0f2f5; padding: 20px; display: flex; justify-content: center; }
-        .card { background: white; padding: 25px; border-radius: 15px; width: 100%; max-width: 400px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        select, input, button { width: 100%; padding: 12px; margin-top: 10px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; font-size: 16px; }
-        button { background: #28a745; color: white; border: none; font-weight: bold; cursor: pointer; }
+        .card { background: white; padding: 25px; border-radius: 15px; width: 100%; max-width: 450px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        input, select, button { width: 100%; padding: 12px; margin-top: 10px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; font-size: 16px; }
+        button { background: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; margin-top: 20px; }
         button:disabled { background: #ccc; }
-        .status { text-align: center; color: #666; margin-top: 15px; font-weight: bold; }
+        .status { text-align: center; color: #666; margin-top: 15px; font-weight: bold; min-height: 20px; }
+        #shopSelect { height: 150px; } /* Делаем список выше для удобства */
     </style>
 </head>
 <body>
 <div class="card">
     <h2>📸 Фотоотчет</h2>
-    <label>Выберите магазин:</label>
-    <select id="shopSelect"></select>
-    <div id="inputs"></div>
+
+    <label>Поиск магазина (номер или город):</label>
+    <input type="text" id="shopSearch" placeholder="Введите № или город..." oninput="filterShops()">
+
+    <select id="shopSelect" size="5"></select>
+
+    <div id="inputs">
+        </div>
+
     <button id="mainBtn" onclick="send()">ОТПРАВИТЬ ОТЧЕТ</button>
     <p id="status" class="status"></p>
 </div>
 
 <script>
-    const SERVER_URL = "https://SaigonUkirich.pythonanywhere.com/send";
-    
-    const shops = [
-        { name: "№554. Минск, Минская 7", email: "pozhitoka@dobronom.by" },
-        { name: "№123. Минск, Победителей 1", email: "andrew.pozhitok@gmail.com" },
-        { name: "№777. Гродно, Советская 5", email: "boss@yandex.ru" }
-    ];
+    const SERVER_URL = "https://SaigonUkirich.pythonanywhere.com";
+    let allShops = [];
 
-    const select = document.getElementById('shopSelect');
-    shops.forEach(s => select.add(new Option(s.name, s.email)));
-
+    // Создаем поля для выбора файлов
     const inputDiv = document.getElementById('inputs');
     for(let i=0; i<7; i++) {
         let inp = document.createElement('input');
@@ -43,9 +43,38 @@
         inputDiv.appendChild(inp);
     }
 
+    // Загрузка магазинов с сервера при старте
+    async function loadShops() {
+        document.getElementById('status').innerText = "Загрузка списка магазинов...";
+        try {
+            const response = await fetch(`${SERVER_URL}/get_shops`);
+            allShops = await response.json();
+            displayShops(allShops);
+            document.getElementById('status').innerText = "";
+        } catch (e) {
+            document.getElementById('status').innerText = "Ошибка загрузки магазинов";
+        }
+    }
+
+    function displayShops(shops) {
+        const select = document.getElementById('shopSelect');
+        select.innerHTML = "";
+        shops.forEach(s => select.add(new Option(s.name, s.email)));
+    }
+
+    function filterShops() {
+        const text = document.getElementById('shopSearch').value.toLowerCase();
+        const filtered = allShops.filter(s => s.name.toLowerCase().includes(text));
+        displayShops(filtered);
+    }
+
     async function send() {
         const btn = document.getElementById('mainBtn');
         const status = document.getElementById('status');
+        const select = document.getElementById('shopSelect');
+
+        if (!select.value) return alert("Сначала выберите магазин в списке!");
+
         btn.disabled = true;
         status.innerText = "Сжимаем фото...";
 
@@ -68,9 +97,9 @@
 
             if(count === 0) throw "Выберите хотя бы одно фото!";
 
-            status.innerText = "Отправка на сервер...";
-            
-            const response = await fetch(SERVER_URL, {
+            status.innerText = "Отправка отчета...";
+
+            const response = await fetch(`${SERVER_URL}/send`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -81,7 +110,7 @@
                 location.reload();
             } else {
                 const err = await response.json();
-                throw "Ошибка сервера: " + err.message;
+                throw "Ошибка: " + err.message;
             }
         } catch (e) {
             alert(e);
@@ -89,6 +118,8 @@
             status.innerText = "";
         }
     }
+
+    loadShops();
 </script>
 </body>
 </html>
