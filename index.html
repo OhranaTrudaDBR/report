@@ -120,6 +120,17 @@
 
     window.onclick = (e) => { if (!e.target.matches('#shopInput')) document.getElementById('shopDropdown').style.display = "none"; };
 
+    // Функция для перевода кириллицы в латиницу (для имен файлов)
+    function translit(word) {
+        const converter = {
+            'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e', 'ж': 'zh', 'з': 'z',
+            'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r',
+            'с': 's', 'т': 't', 'у': 'u', 'ф': 'f', 'х': 'h', 'ц': 'c', 'ч': 'ch', 'ш': 'sh', 'щ': 'sch',
+            'ь': '', 'ы': 'y', 'ъ': '', 'э': 'e', 'ю': 'yu', 'я': 'ya'
+        };
+        return word.toLowerCase().split('').map(char => converter[char] || char).join('');
+    }
+
     async function sendReport() {
         const btn = document.getElementById('sendBtn');
         const status = document.getElementById('status');
@@ -141,16 +152,16 @@
             for (let i = 0; i < inputFields.length; i++) {
                 const files = inputFields[i].files;
 
-                // Формируем красивое имя из названия поля
-                let cleanName = labelElements[i].innerText
-                    .replace(/^\d+\.\s*/, '') // Убираем "1. "
-                    .replace(/[^a-zа-я0-9]/gi, '_') // Все спецсимволы в подчеркивание
-                    .replace(/_+/g, '_') // Убираем двойные подчеркивания
-                    .substring(0, 30); // Не слишком длинное имя
+                // Берем название, переводим в латиницу и убираем лишнее
+                let rawName = labelElements[i].innerText.replace(/^\d+\.\s*/, '');
+                let cleanName = translit(rawName)
+                    .replace(/[^a-z0-9]/gi, '_') // Оставляем только латиницу и цифры
+                    .replace(/_+/g, '_')
+                    .substring(0, 25);
 
                 for (let j = 0; j < files.length; j++) {
                     processed++;
-                    status.innerHTML = `Обработка: ${cleanName.replace(/_/g, ' ')}...`;
+                    status.innerHTML = `Обработка: ${rawName.substring(0, 20)}...`;
 
                     const comp = await imageCompression(files[j], {
                         maxSizeMB: 0.5,
@@ -159,7 +170,7 @@
                     });
                     const base64 = await imageCompression.getDataUrlFromFile(comp);
 
-                    // Ключ для сервера будет названием раздела + индекс
+                    // Имя ключа теперь точно безопасное (напр. "Licevaya_storona_0")
                     payload[`${cleanName}_${j}`] = base64;
                 }
             }
@@ -171,9 +182,19 @@
                 body: JSON.stringify(payload)
             });
 
-            if (res.ok) { alert("Отчет успешно отправлен!"); location.reload(); }
-            else throw "Ошибка при отправке";
-        } catch (err) { alert(err); btn.disabled = false; status.innerText = ""; }
+            if (res.ok) {
+                alert("Отчет успешно отправлен!");
+                location.reload();
+            } else {
+                const errorText = await res.text();
+                console.error("Server error:", errorText);
+                throw "Ошибка сервера. Возможно, слишком много фото.";
+            }
+        } catch (err) {
+            alert(err);
+            btn.disabled = false;
+            status.innerText = "";
+        }
     }
 
     loadShops();
