@@ -52,17 +52,17 @@
         "1. Лицевая сторона личной карточки учета СИЗ",
         "2. Оборотная сторона личной карточки учета СИЗ",
         "3. Журнал регистрации вводного инструктажа",
-        "4. Журнал регистрации инструктажа по ОТ",
+        "4. Журнал регистрации инструктажа на РМ",
         "5. Журнал контроля за соблюдением требований ОТ",
         "6. Журнал учета и испытаний лестниц",
         "7. Журнал осмотра грузовых тележек"
     ];
 
     const extraLabels = [
-        "8. Журнал освидетельствования работников",
-        "9. Журнал учета выпуска на линию и возвращающегося с линии напольного безрельсового транспорта (+бирки)",
-        "10. Журнал учета неисправностей, выявленных при ежедневном осмотре напольного безрельсового транспорта",
-        "11. Распоряжение о закреплении напольного безрельсового транспорта"
+        "8. Журнал учета работ по нарядам-допускам",
+        "9. Журнал регистрации несчастных случаев",
+        "10. Протоколы проверки знаний",
+        "11. Прочее (дополнительно)"
     ];
 
     async function loadShops() {
@@ -135,77 +135,95 @@
     const wait = (ms) => new Promise(res => setTimeout(res, ms));
 
     async function sendReport() {
-        const btn = document.getElementById('sendBtn');
-        const status = document.getElementById('status');
-        const email = document.getElementById('selectedEmail').value;
-        const shopName = document.getElementById('shopInput').value;
+    const btn = document.getElementById('sendBtn');
+    const status = document.getElementById('status');
+    const email = document.getElementById('selectedEmail').value;
+    const shopName = document.getElementById('shopInput').value;
 
-        btn.disabled = true;
-        const payload = { target_email: email, shop_name: shopName };
-        const inputFields = document.querySelectorAll('.photo-file');
-        const labelElements = document.querySelectorAll('.photo-label');
+    btn.disabled = true;
+    const payload = { target_email: email, shop_name: shopName };
+    const inputFields = document.querySelectorAll('.photo-file');
 
-        let totalFiles = 0;
-        inputFields.forEach(input => totalFiles += input.files.length);
-        if (totalFiles === 0) return (alert("Выберите фото!"), btn.disabled = false);
+    // Твой список названий для файлов (строго по порядку полей)
+    const fileNames = [
+        "Licevaya",            // f0
+        "Oborotnaya",          // f1
+        "Vvodni_instructag",   // f2
+        "InstructagOT",        // f3
+        "KontrolOT",           // f4
+        "Ispitaniya_lestici",  // f5
+        "Gruzovie_telegki",    // f6
+        "Osvid_rabotnik_rohlya", // f7
+        "Vipusk_linii_rohlya",  // f8
+        "Neispravnosti_rohlya", // f9
+        "Zakreplenie_rohlya"    // f10
+    ];
 
-        try {
-            // 1. Сжатие фото (делаем один раз перед отправкой)
-            let processed = 0;
-            for (let i = 0; i < inputFields.length; i++) {
-                const files = inputFields[i].files;
-                let rawName = labelElements[i].innerText.replace(/^\d+\.\s*/, '');
-                let cleanName = translit(rawName).replace(/[^a-z0-9]/gi, '_').replace(/_+/g, '_').substring(0, 25);
+    let totalFiles = 0;
+    inputFields.forEach(input => totalFiles += input.files.length);
+    if (totalFiles === 0) return (alert("Выберите фото!"), btn.disabled = false);
 
-                for (let j = 0; j < files.length; j++) {
-                    processed++;
-                    status.innerHTML = `Сжатие: ${processed} из ${totalFiles}...`;
-                    const comp = await imageCompression(files[j], { maxSizeMB: 0.5, maxWidthOrHeight: 1200, useWebWorker: true });
-                    payload[`${cleanName}_${j}`] = await imageCompression.getDataUrlFromFile(comp);
-                }
+    try {
+        let processed = 0;
+        for (let i = 0; i < inputFields.length; i++) {
+            const files = inputFields[i].files;
+            // Берем имя из нашего списка по индексу i
+            let baseName = fileNames[i] || ("field_" + i);
+
+            for (let j = 0; j < files.length; j++) {
+                processed++;
+                status.innerHTML = `Сжатие: ${processed} из ${totalFiles}...`;
+
+                // Уменьшил до 0.4 для надежности
+                const comp = await imageCompression(files[j], {
+                    maxSizeMB: 0.4,
+                    maxWidthOrHeight: 1200,
+                    useWebWorker: true
+                });
+                const base64 = await imageCompression.getDataUrlFromFile(comp);
+
+                // Итоговое имя: Licevaya_0, Licevaya_1 и т.д.
+                payload[`${baseName}_${j}`] = base64;
             }
-
-            // 2. Отправка с повторными попытками (Retry Logic)
-            const MAX_RETRIES = 3;
-            let success = False;
-
-            for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-                try {
-                    status.innerHTML = attempt > 1
-                        ? `Попытка ${attempt} из ${MAX_RETRIES}...`
-                        : `Отправка ${totalFiles} фото...`;
-
-                    const res = await fetch(`${SERVER_URL}/send`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (res.ok) {
-                        success = true;
-                        break; // Выходим из цикла, если успешно
-                    } else {
-                        throw new Error("Ошибка сервера");
-                    }
-                } catch (e) {
-                    if (attempt === MAX_RETRIES) throw e; // Если последняя попытка — пробрасываем ошибку
-                    console.log(`Попытка ${attempt} не удалась, пробуем снова...`);
-                    await wait(2000); // Ждем 2 секунды перед следующим разом
-                }
-            }
-
-            if (success) {
-                alert("Отчет успешно доставлен!");
-                location.reload();
-            }
-
-        } catch (err) {
-            console.error(err);
-            alert("Не удалось отправить отчет после нескольких попыток. Проверьте интернет или попробуйте позже.");
-            btn.disabled = false;
-            status.innerText = "";
         }
+
+        const MAX_RETRIES = 3;
+        let success = false;
+
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                status.innerHTML = attempt > 1
+                    ? `Повтор отправки (попытка ${attempt})...`
+                    : `Отправка данных на сервер...`;
+
+                const res = await fetch(`${SERVER_URL}/send`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (res.ok) {
+                    success = true;
+                    break;
+                } else {
+                    throw new Error("Server error");
+                }
+            } catch (e) {
+                if (attempt === MAX_RETRIES) throw e;
+                await new Promise(r => setTimeout(r, 2000));
+            }
+        }
+
+        if (success) {
+            alert("Отчет успешно отправлен!");
+            location.reload();
+        }
+    } catch (err) {
+        alert("Ошибка отправки. Попробуйте еще раз или уменьшите количество фото.");
+        btn.disabled = false;
+        status.innerText = "";
     }
+}
 
     loadShops();
 </script>
