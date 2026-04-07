@@ -11,8 +11,8 @@
         h2 { text-align: center; color: #333; margin-bottom: 20px; }
 
         /* Стили выпадающего списка (ComboBox) */
-        .shop-container { position: relative; margin-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; font-weight: 600; color: #555; font-size: 14px; }
+        .shop-container { position: relative; margin-bottom: 25px; }
+        .main-label { display: block; margin-bottom: 8px; font-weight: 700; color: #333; font-size: 15px; }
         #shopInput { width: 100%; padding: 12px; border: 2px solid #e1e4e8; border-radius: 10px; font-size: 16px; box-sizing: border-box; outline: none; transition: border-color 0.3s; }
         #shopInput:focus { border-color: #007bff; }
 
@@ -25,9 +25,19 @@
         .dropdown-item:hover { background-color: #f0f7ff; color: #007bff; }
         .dropdown-item:last-child { border-bottom: none; }
 
-        /* Поля файлов */
-        .photo-grid { display: grid; gap: 10px; margin-bottom: 20px; }
-        input[type="file"] { width: 100%; padding: 8px; background: #fafafa; border: 1px dashed #ccc; border-radius: 8px; font-size: 13px; }
+        /* Стили контейнеров для фото */
+        .photo-grid { display: flex; flex-direction: column; gap: 15px; margin-bottom: 25px; }
+        .photo-item {
+            background: #fafafa;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid #eee;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .photo-label { font-size: 13px; font-weight: 600; color: #555; }
+        input[type="file"] { font-size: 13px; color: #666; width: 100%; }
 
         button {
             width: 100%; padding: 15px; background: #007bff; color: white;
@@ -43,21 +53,18 @@
 <body>
 
 <div class="card">
-    <h2>📸 Документы ОТ</h2>
+    <h2>📸 Фотоотчет ОТ</h2>
 
     <div class="shop-container">
-        <label>Магазин:</label>
+        <label class="main-label">Выберите магазин:</label>
         <input type="text" id="shopInput" autocomplete="off"
                placeholder="Введите номер или город..."
                onclick="toggleDropdown()" oninput="filterShops()">
-
-        <div id="shopDropdown" class="dropdown-content">
-            </div>
+        <div id="shopDropdown" class="dropdown-content"></div>
         <input type="hidden" id="selectedEmail">
     </div>
 
-    <div class="photo-grid" id="photoInputs">
-        </div>
+    <div class="photo-grid" id="photoInputs"></div>
 
     <button id="sendBtn" onclick="sendReport()">ОТПРАВИТЬ ОТЧЕТ</button>
     <p id="status" class="status"></p>
@@ -67,17 +74,37 @@
     const SERVER_URL = "https://SaigonUkirich.pythonanywhere.com";
     let allShops = [];
 
-    // Генерируем поля для выбора фото
+    // Список названий для полей (можно менять здесь)
+    const labels = [
+        "1. Общий вид входа",
+        "2. Уголок охраны труда",
+        "3. Стеллажное оборудование",
+        "4. Электрощитовая",
+        "5. Подсобное помещение",
+        "6. Бытовое помещение",
+        "7. Прочее (нарушения/замечания)"
+    ];
+
+    // Генерируем поля для выбора фото с подписями
     const photoContainer = document.getElementById('photoInputs');
-    for (let i = 0; i < 7; i++) {
+    labels.forEach((text, i) => {
+        const item = document.createElement('div');
+        item.className = 'photo-item';
+
+        const label = document.createElement('label');
+        label.className = 'photo-label';
+        label.innerText = text;
+
         const input = document.createElement('input');
         input.type = 'file';
         input.className = 'photo-file';
         input.accept = 'image/*';
-        photoContainer.appendChild(input);
-    }
 
-    // Загрузка магазинов при старте
+        item.appendChild(label);
+        item.appendChild(input);
+        photoContainer.appendChild(item);
+    });
+
     async function loadShops() {
         const status = document.getElementById('status');
         try {
@@ -101,7 +128,6 @@
         const text = document.getElementById('shopInput').value.toLowerCase();
         const dropdown = document.getElementById('shopDropdown');
         dropdown.style.display = "block";
-
         const filtered = allShops.filter(s => s.name.toLowerCase().includes(text));
         renderList(filtered.slice(0, 50));
     }
@@ -122,7 +148,6 @@
         });
     }
 
-    // Закрытие списка при клике вовне
     window.onclick = (e) => {
         if (!e.target.matches('#shopInput')) {
             document.getElementById('shopDropdown').style.display = "none";
