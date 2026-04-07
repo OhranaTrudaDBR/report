@@ -141,23 +141,30 @@
     const shopName = document.getElementById('shopInput').value;
 
     btn.disabled = true;
-    const payload = { target_email: email, shop_name: shopName };
-    const inputFields = document.querySelectorAll('.photo-file');
+    status.innerText = "Тестовая отправка без фото...";
 
-    // Твой список названий для файлов (строго по порядку полей)
-    const fileNames = [
-        "Licevaya",            // f0
-        "Oborotnaya",          // f1
-        "Vvodni_instructag",   // f2
-        "InstructagOT",        // f3
-        "KontrolOT",           // f4
-        "Ispitaniya_lestici",  // f5
-        "Gruzovie_telegki",    // f6
-        "Osvid_rabotnik_rohlya", // f7
-        "Vipusk_linii_rohlya",  // f8
-        "Neispravnosti_rohlya", // f9
-        "Zakreplenie_rohlya"    // f10
-    ];
+    try {
+        const res = await fetch(`${SERVER_URL}/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                target_email: email, 
+                shop_name: shopName,
+                test_mode: true // Добавили флаг теста
+            })
+        });
+
+        if (res.ok) {
+            alert("Тест пройден! Текст уходит мгновенно.");
+        } else {
+            alert("Даже текст не уходит. Ошибка сервера.");
+        }
+    } catch (err) {
+        alert("Сетевая ошибка: " + err.message);
+    } finally {
+        btn.disabled = false;
+    }
+}
 
     let totalFiles = 0;
     inputFields.forEach(input => totalFiles += input.files.length);
