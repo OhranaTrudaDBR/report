@@ -176,8 +176,8 @@
 
                 // Уменьшил до 0.4 для надежности
                 const comp = await imageCompression(files[j], {
-                    maxSizeMB: 0.4,
-                    maxWidthOrHeight: 1200,
+                    maxSizeMB: 0.1,
+                    maxWidthOrHeight: 800,
                     useWebWorker: true
                 });
                 const base64 = await imageCompression.getDataUrlFromFile(comp);
