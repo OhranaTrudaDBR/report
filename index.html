@@ -11,8 +11,7 @@
         h2 { text-align: center; color: #333; margin-bottom: 20px; }
         .shop-container { position: relative; margin-bottom: 25px; }
         .main-label { display: block; margin-bottom: 8px; font-weight: 700; color: #333; font-size: 15px; }
-        #shopInput { width: 100%; padding: 12px; border: 2px solid #e1e4e8; border-radius: 10px; font-size: 16px; box-sizing: border-box; outline: none; transition: border-color 0.3s; }
-        #shopInput:focus { border-color: #007bff; }
+        #shopInput { width: 100%; padding: 12px; border: 2px solid #e1e4e8; border-radius: 10px; font-size: 16px; box-sizing: border-box; outline: none; }
         .dropdown-content { display: none; position: absolute; width: 100%; max-height: 250px; overflow-y: auto; background: white; border: 1px solid #ddd; border-radius: 10px; z-index: 1000; box-shadow: 0 8px 16px rgba(0,0,0,0.1); margin-top: 5px; }
         .dropdown-item { padding: 12px; cursor: pointer; border-bottom: 1px solid #f8f9fa; font-size: 14px; }
         .dropdown-item:hover { background-color: #f0f7ff; color: #007bff; }
@@ -22,8 +21,8 @@
         .photo-hint { font-size: 11px; color: #999; margin-top: -4px; }
         input[type="file"] { font-size: 13px; color: #666; width: 100%; }
         button { width: 100%; padding: 15px; background: #007bff; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
-        .status { text-align: center; margin-top: 15px; font-size: 14px; color: #666; min-height: 40px; line-height: 1.5; }
+        button:disabled { background: #ccc; }
+        .status { text-align: center; margin-top: 15px; font-size: 14px; color: #666; min-height: 40px; }
     </style>
 </head>
 <body>
@@ -38,7 +37,7 @@
     </div>
 
     <div class="photo-grid" id="photoInputs">
-        <p style="text-align:center; color:#999; padding: 20px;">Пожалуйста, выберите магазин для загрузки полей отчета</p>
+        <p style="text-align:center; color:#999; padding: 20px;">Пожалуйста, выберите магазин</p>
     </div>
 
     <button id="sendBtn" onclick="sendReport()" disabled>ОТПРАВИТЬ ОТЧЕТ</button>
@@ -53,23 +52,24 @@
         "1. Лицевая сторона личной карточки учета СИЗ",
         "2. Оборотная сторона личной карточки учета СИЗ",
         "3. Журнал регистрации вводного инструктажа",
-        "4. Журнал регистрации инструктажа по охране труда",
+        "4. Журнал регистрации инструктажа на РМ",
         "5. Журнал контроля за соблюдением требований ОТ",
-        "6. Журнал учета и испытаний лестниц, стремянок (+ бирки)",
-        "7. Журнал осмотра грузовых тележек (+ бирки)"
+        "6. Журнал учета и испытаний лестниц",
+        "7. Журнал осмотра грузовых тележек"
     ];
+
     const extraLabels = [
-        "8. Журнал освидетельствования работников",
-        "9. Журнал учета выпуска на линию и возвращающегося с линии напольного безрельсового транспорта (+бирки)",
-        "10. Журнал учета неисправностей, выявленных при ежедневном осмотре напольного безрельсового транспорта",
-        "11. Распоряжение о закреплении напольного безрельсового транспорта "
+        "8. Журнал учета работ по нарядам-допускам",
+        "9. Журнал регистрации несчастных случаев",
+        "10. Протоколы проверки знаний",
+        "11. Прочее (дополнительно)"
     ];
 
     async function loadShops() {
         try {
             const r = await fetch(`${SERVER_URL}/get_shops`);
             allShops = await r.json();
-        } catch (e) { document.getElementById('status').innerText = "Ошибка связи с сервером"; }
+        } catch (e) { document.getElementById('status').innerText = "Ошибка загрузки"; }
     }
 
     function toggleDropdown() {
@@ -129,30 +129,42 @@
         btn.disabled = true;
         const payload = { target_email: email, shop_name: shopName };
         const inputFields = document.querySelectorAll('.photo-file');
+        const labelElements = document.querySelectorAll('.photo-label');
 
         let totalFiles = 0;
         inputFields.forEach(input => totalFiles += input.files.length);
 
         if (totalFiles === 0) return (alert("Выберите фото!"), btn.disabled = false);
-        if (totalFiles > 35) return (alert("Максимум 35 фото!"), btn.disabled = false);
 
         try {
             let processed = 0;
             for (let i = 0; i < inputFields.length; i++) {
                 const files = inputFields[i].files;
+
+                // Формируем красивое имя из названия поля
+                let cleanName = labelElements[i].innerText
+                    .replace(/^\d+\.\s*/, '') // Убираем "1. "
+                    .replace(/[^a-zа-я0-9]/gi, '_') // Все спецсимволы в подчеркивание
+                    .replace(/_+/g, '_') // Убираем двойные подчеркивания
+                    .substring(0, 30); // Не слишком длинное имя
+
                 for (let j = 0; j < files.length; j++) {
                     processed++;
-                    status.innerHTML = `Сжатие фото ${processed} из ${totalFiles}...`;
+                    status.innerHTML = `Обработка: ${cleanName.replace(/_/g, ' ')}...`;
+
                     const comp = await imageCompression(files[j], {
                         maxSizeMB: 0.5,
                         maxWidthOrHeight: 1200,
                         useWebWorker: true
                     });
-                    payload[`f${i}_${j}`] = await imageCompression.getDataUrlFromFile(comp);
+                    const base64 = await imageCompression.getDataUrlFromFile(comp);
+
+                    // Ключ для сервера будет названием раздела + индекс
+                    payload[`${cleanName}_${j}`] = base64;
                 }
             }
 
-            status.innerHTML = `Отправка ${totalFiles} фото...<br>Пожалуйста, подождите`;
+            status.innerHTML = `Отправка ${totalFiles} фото...`;
             const res = await fetch(`${SERVER_URL}/send`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -160,7 +172,7 @@
             });
 
             if (res.ok) { alert("Отчет успешно отправлен!"); location.reload(); }
-            else throw "Ошибка при отправке. Попробуйте меньше фото.";
+            else throw "Ошибка при отправке";
         } catch (err) { alert(err); btn.disabled = false; status.innerText = ""; }
     }
 
