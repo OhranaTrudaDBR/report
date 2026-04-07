@@ -44,7 +44,9 @@
 </div>
 
 <script>
-    const SERVER_URL = "https://SaigonUkirich.pythonanywhere.com";
+    // ОБНОВЛЕННЫЙ АДРЕС СЕРВЕРА НА RENDER
+    const SERVER_URL = "https://my-report-backend.onrender.com";
+    
     let allShops = [];
 
     const fileNamesMap = [
@@ -74,7 +76,9 @@
         try {
             const r = await fetch(`${SERVER_URL}/get_shops`);
             allShops = await r.json();
-        } catch (e) { document.getElementById('status').innerText = "Ошибка загрузки списка магазинов"; }
+        } catch (e) { 
+            document.getElementById('status').innerText = "Ошибка загрузки списка магазинов"; 
+        }
     }
 
     function toggleDropdown() {
@@ -137,7 +141,6 @@
         let totalFiles = 0;
         inputFields.forEach(input => totalFiles += input.files.length);
 
-        // ТЕСТОВЫЙ РЕЖИМ (если нет фото)
         if (totalFiles === 0) {
             status.innerText = "Проверка связи...";
             payload.test_mode = true;
