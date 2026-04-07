@@ -6,28 +6,60 @@
     <title>Фотоотчет Охрана Труда</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/browser-image-compression/2.0.2/browser-image-compression.min.js"></script>
     <style>
-        body { font-family: sans-serif; background: #f0f2f5; padding: 20px; display: flex; justify-content: center; }
-        .card { background: white; padding: 25px; border-radius: 15px; width: 100%; max-width: 450px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        input, select, button { width: 100%; padding: 12px; margin-top: 10px; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; font-size: 16px; }
-        button { background: #007bff; color: white; border: none; font-weight: bold; cursor: pointer; margin-top: 20px; }
-        button:disabled { background: #ccc; }
-        .status { text-align: center; color: #666; margin-top: 15px; font-weight: bold; min-height: 20px; }
-        #shopSelect { height: 150px; } /* Делаем список выше для удобства */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f4f7f9; padding: 20px; display: flex; justify-content: center; }
+        .card { background: white; padding: 25px; border-radius: 16px; width: 100%; max-width: 450px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+        h2 { text-align: center; color: #333; margin-bottom: 20px; }
+
+        /* Стили выпадающего списка (ComboBox) */
+        .shop-container { position: relative; margin-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: 600; color: #555; font-size: 14px; }
+        #shopInput { width: 100%; padding: 12px; border: 2px solid #e1e4e8; border-radius: 10px; font-size: 16px; box-sizing: border-box; outline: none; transition: border-color 0.3s; }
+        #shopInput:focus { border-color: #007bff; }
+
+        .dropdown-content {
+            display: none; position: absolute; width: 100%; max-height: 250px;
+            overflow-y: auto; background: white; border: 1px solid #ddd;
+            border-radius: 10px; z-index: 1000; box-shadow: 0 8px 16px rgba(0,0,0,0.1); margin-top: 5px;
+        }
+        .dropdown-item { padding: 12px; cursor: pointer; border-bottom: 1px solid #f8f9fa; font-size: 14px; line-height: 1.4; }
+        .dropdown-item:hover { background-color: #f0f7ff; color: #007bff; }
+        .dropdown-item:last-child { border-bottom: none; }
+
+        /* Поля файлов */
+        .photo-grid { display: grid; gap: 10px; margin-bottom: 20px; }
+        input[type="file"] { width: 100%; padding: 8px; background: #fafafa; border: 1px dashed #ccc; border-radius: 8px; font-size: 13px; }
+
+        button {
+            width: 100%; padding: 15px; background: #007bff; color: white;
+            border: none; border-radius: 10px; font-size: 16px; font-weight: bold;
+            cursor: pointer; transition: background 0.3s;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+
+        .status { text-align: center; margin-top: 15px; font-size: 14px; color: #666; min-height: 20px; }
     </style>
 </head>
 <body>
+
 <div class="card">
-    <h2>📸 Фотоотчет</h2>
+    <h2>📸 Фотоотчет ОТ</h2>
 
-    <label>Поиск магазина (номер или город):</label>
-    <input type="text" id="shopSearch" placeholder="Введите № или город..." oninput="filterShops()">
+    <div class="shop-container">
+        <label>Магазин:</label>
+        <input type="text" id="shopInput" autocomplete="off"
+               placeholder="Введите номер или город..."
+               onclick="toggleDropdown()" oninput="filterShops()">
 
-    <select id="shopSelect" size="5"></select>
+        <div id="shopDropdown" class="dropdown-content">
+            </div>
+        <input type="hidden" id="selectedEmail">
+    </div>
 
-    <div id="inputs">
+    <div class="photo-grid" id="photoInputs">
         </div>
 
-    <button id="mainBtn" onclick="send()">ОТПРАВИТЬ ОТЧЕТ</button>
+    <button id="sendBtn" onclick="sendReport()">ОТПРАВИТЬ ОТЧЕТ</button>
     <p id="status" class="status"></p>
 </div>
 
@@ -35,70 +67,95 @@
     const SERVER_URL = "https://SaigonUkirich.pythonanywhere.com";
     let allShops = [];
 
-    // Создаем поля для выбора файлов
-    const inputDiv = document.getElementById('inputs');
-    for(let i=0; i<7; i++) {
-        let inp = document.createElement('input');
-        inp.type = 'file'; inp.className = 'photo-inp'; inp.accept = 'image/*';
-        inputDiv.appendChild(inp);
+    // Генерируем поля для выбора фото
+    const photoContainer = document.getElementById('photoInputs');
+    for (let i = 0; i < 7; i++) {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.className = 'photo-file';
+        input.accept = 'image/*';
+        photoContainer.appendChild(input);
     }
 
-    // Загрузка магазинов с сервера при старте
+    // Загрузка магазинов при старте
     async function loadShops() {
-        document.getElementById('status').innerText = "Загрузка списка магазинов...";
+        const status = document.getElementById('status');
         try {
             const response = await fetch(`${SERVER_URL}/get_shops`);
             allShops = await response.json();
-            displayShops(allShops);
-            document.getElementById('status').innerText = "";
         } catch (e) {
-            document.getElementById('status').innerText = "Ошибка загрузки магазинов";
+            status.innerText = "Ошибка связи с сервером";
+            console.error(e);
         }
     }
 
-    function displayShops(shops) {
-        const select = document.getElementById('shopSelect');
-        select.innerHTML = "";
-        shops.forEach(s => select.add(new Option(s.name, s.email)));
+    function toggleDropdown() {
+        const dropdown = document.getElementById('shopDropdown');
+        dropdown.style.display = "block";
+        if (allShops.length > 0 && dropdown.innerHTML === "") {
+            renderList(allShops.slice(0, 50));
+        }
     }
 
     function filterShops() {
-        const text = document.getElementById('shopSearch').value.toLowerCase();
+        const text = document.getElementById('shopInput').value.toLowerCase();
+        const dropdown = document.getElementById('shopDropdown');
+        dropdown.style.display = "block";
+
         const filtered = allShops.filter(s => s.name.toLowerCase().includes(text));
-        displayShops(filtered);
+        renderList(filtered.slice(0, 50));
     }
 
-    async function send() {
-        const btn = document.getElementById('mainBtn');
-        const status = document.getElementById('status');
-        const select = document.getElementById('shopSelect');
+    function renderList(shops) {
+        const dropdown = document.getElementById('shopDropdown');
+        dropdown.innerHTML = "";
+        shops.forEach(s => {
+            const item = document.createElement('div');
+            item.className = 'dropdown-item';
+            item.innerText = s.name;
+            item.onclick = () => {
+                document.getElementById('shopInput').value = s.name;
+                document.getElementById('selectedEmail').value = s.email;
+                dropdown.style.display = "none";
+            };
+            dropdown.appendChild(item);
+        });
+    }
 
-        if (!select.value) return alert("Сначала выберите магазин в списке!");
+    // Закрытие списка при клике вовне
+    window.onclick = (e) => {
+        if (!e.target.matches('#shopInput')) {
+            document.getElementById('shopDropdown').style.display = "none";
+        }
+    };
+
+    async function sendReport() {
+        const btn = document.getElementById('sendBtn');
+        const status = document.getElementById('status');
+        const email = document.getElementById('selectedEmail').value;
+        const shopName = document.getElementById('shopInput').value;
+
+        if (!email) return alert("Пожалуйста, выберите магазин из выпадающего списка!");
 
         btn.disabled = true;
-        status.innerText = "Сжимаем фото...";
+        status.innerText = "Сжатие изображений...";
 
-        const payload = {
-            target_email: select.value,
-            shop_name: select.options[select.selectedIndex].text
-        };
-
-        const files = document.querySelectorAll('.photo-inp');
-        let count = 0;
+        const payload = { target_email: email, shop_name: shopName };
+        const files = document.querySelectorAll('.photo-file');
+        let hasFiles = false;
 
         try {
-            for(let i=0; i<files.length; i++) {
-                if(files[i].files[0]) {
-                    const compressed = await imageCompression(files[i].files[0], { maxSizeMB: 0.7, maxWidthOrHeight: 1280 });
-                    payload["file" + i] = await imageCompression.getDataUrlFromFile(compressed);
-                    count++;
+            for (let i = 0; i < files.length; i++) {
+                if (files[i].files[0]) {
+                    const compressed = await imageCompression(files[i].files[0], { maxSizeMB: 0.8, maxWidthOrHeight: 1280 });
+                    payload[`file${i}`] = await imageCompression.getDataUrlFromFile(compressed);
+                    hasFiles = true;
                 }
             }
 
-            if(count === 0) throw "Выберите хотя бы одно фото!";
+            if (!hasFiles) throw "Выберите хотя бы одно фото!";
 
-            status.innerText = "Отправка отчета...";
-
+            status.innerText = "Отправка на почту...";
             const response = await fetch(`${SERVER_URL}/send`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -106,14 +163,13 @@
             });
 
             if (response.ok) {
-                alert("Успешно! Отчет отправлен.");
+                alert("Отчет успешно отправлен!");
                 location.reload();
             } else {
-                const err = await response.json();
-                throw "Ошибка: " + err.message;
+                throw "Ошибка сервера. Проверьте логи.";
             }
-        } catch (e) {
-            alert(e);
+        } catch (err) {
+            alert(err);
             btn.disabled = false;
             status.innerText = "";
         }
