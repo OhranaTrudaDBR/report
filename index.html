@@ -10,7 +10,6 @@
         .card { background: white; padding: 25px; border-radius: 16px; width: 100%; max-width: 450px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
         h2 { text-align: center; color: #333; margin-bottom: 20px; }
 
-        /* Стили выпадающего списка (ComboBox) */
         .shop-container { position: relative; margin-bottom: 25px; }
         .main-label { display: block; margin-bottom: 8px; font-weight: 700; color: #333; font-size: 15px; }
         #shopInput { width: 100%; padding: 12px; border: 2px solid #e1e4e8; border-radius: 10px; font-size: 16px; box-sizing: border-box; outline: none; transition: border-color 0.3s; }
@@ -21,22 +20,17 @@
             overflow-y: auto; background: white; border: 1px solid #ddd;
             border-radius: 10px; z-index: 1000; box-shadow: 0 8px 16px rgba(0,0,0,0.1); margin-top: 5px;
         }
-        .dropdown-item { padding: 12px; cursor: pointer; border-bottom: 1px solid #f8f9fa; font-size: 14px; line-height: 1.4; }
+        .dropdown-item { padding: 12px; cursor: pointer; border-bottom: 1px solid #f8f9fa; font-size: 14px; }
         .dropdown-item:hover { background-color: #f0f7ff; color: #007bff; }
-        .dropdown-item:last-child { border-bottom: none; }
 
-        /* Стили контейнеров для фото */
         .photo-grid { display: flex; flex-direction: column; gap: 15px; margin-bottom: 25px; }
         .photo-item {
-            background: #fafafa;
-            padding: 12px;
-            border-radius: 12px;
-            border: 1px solid #eee;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
+            background: #fafafa; padding: 12px; border-radius: 12px;
+            border: 1px solid #eee; display: flex; flex-direction: column; gap: 8px;
         }
         .photo-label { font-size: 13px; font-weight: 600; color: #555; }
+        .photo-hint { font-size: 11px; color: #999; margin-top: -4px; }
+
         input[type="file"] { font-size: 13px; color: #666; width: 100%; }
 
         button {
@@ -47,7 +41,7 @@
         button:hover { background: #0056b3; }
         button:disabled { background: #ccc; cursor: not-allowed; }
 
-        .status { text-align: center; margin-top: 15px; font-size: 14px; color: #666; min-height: 20px; }
+        .status { text-align: center; margin-top: 15px; font-size: 14px; color: #666; min-height: 40px; line-height: 1.5; }
     </style>
 </head>
 <body>
@@ -57,9 +51,7 @@
 
     <div class="shop-container">
         <label class="main-label">Выберите магазин:</label>
-        <input type="text" id="shopInput" autocomplete="off"
-               placeholder="Введите номер или город..."
-               onclick="toggleDropdown()" oninput="filterShops()">
+        <input type="text" id="shopInput" autocomplete="off" placeholder="Начните вводить номер или город..." onclick="toggleDropdown()" oninput="filterShops()">
         <div id="shopDropdown" class="dropdown-content"></div>
         <input type="hidden" id="selectedEmail">
     </div>
@@ -74,7 +66,6 @@
     const SERVER_URL = "https://SaigonUkirich.pythonanywhere.com";
     let allShops = [];
 
-    // Список названий для полей (можно менять здесь)
     const labels = [
         "1. Общий вид входа",
         "2. Уголок охраны труда",
@@ -85,56 +76,43 @@
         "7. Прочее (нарушения/замечания)"
     ];
 
-    // Генерируем поля для выбора фото с подписями
+    // Отрисовка полей
     const photoContainer = document.getElementById('photoInputs');
     labels.forEach((text, i) => {
         const item = document.createElement('div');
         item.className = 'photo-item';
-
-        const label = document.createElement('label');
-        label.className = 'photo-label';
-        label.innerText = text;
-
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.className = 'photo-file';
-        input.accept = 'image/*';
-
-        item.appendChild(label);
-        item.appendChild(input);
+        item.innerHTML = `
+            <label class="photo-label">${text}</label>
+            <span class="photo-hint">Можно выбрать несколько фото</span>
+            <input type="file" class="photo-file" accept="image/*" multiple>
+        `;
         photoContainer.appendChild(item);
     });
 
     async function loadShops() {
-        const status = document.getElementById('status');
         try {
             const response = await fetch(`${SERVER_URL}/get_shops`);
             allShops = await response.json();
         } catch (e) {
-            status.innerText = "Ошибка связи с сервером";
-            console.error(e);
+            document.getElementById('status').innerText = "Ошибка загрузки списка магазинов";
         }
     }
 
     function toggleDropdown() {
-        const dropdown = document.getElementById('shopDropdown');
-        dropdown.style.display = "block";
-        if (allShops.length > 0 && dropdown.innerHTML === "") {
-            renderList(allShops.slice(0, 50));
-        }
+        const d = document.getElementById('shopDropdown');
+        d.style.display = "block";
+        if (allShops.length > 0 && d.innerHTML === "") renderList(allShops.slice(0, 50));
     }
 
     function filterShops() {
         const text = document.getElementById('shopInput').value.toLowerCase();
-        const dropdown = document.getElementById('shopDropdown');
-        dropdown.style.display = "block";
         const filtered = allShops.filter(s => s.name.toLowerCase().includes(text));
         renderList(filtered.slice(0, 50));
     }
 
     function renderList(shops) {
-        const dropdown = document.getElementById('shopDropdown');
-        dropdown.innerHTML = "";
+        const d = document.getElementById('shopDropdown');
+        d.innerHTML = "";
         shops.forEach(s => {
             const item = document.createElement('div');
             item.className = 'dropdown-item';
@@ -142,17 +120,13 @@
             item.onclick = () => {
                 document.getElementById('shopInput').value = s.name;
                 document.getElementById('selectedEmail').value = s.email;
-                dropdown.style.display = "none";
+                d.style.display = "none";
             };
-            dropdown.appendChild(item);
+            d.appendChild(item);
         });
     }
 
-    window.onclick = (e) => {
-        if (!e.target.matches('#shopInput')) {
-            document.getElementById('shopDropdown').style.display = "none";
-        }
-    };
+    window.onclick = (e) => { if (!e.target.matches('#shopInput')) document.getElementById('shopDropdown').style.display = "none"; };
 
     async function sendReport() {
         const btn = document.getElementById('sendBtn');
@@ -160,27 +134,47 @@
         const email = document.getElementById('selectedEmail').value;
         const shopName = document.getElementById('shopInput').value;
 
-        if (!email) return alert("Пожалуйста, выберите магазин из выпадающего списка!");
+        if (!email) return alert("Пожалуйста, выберите магазин!");
 
         btn.disabled = true;
-        status.innerText = "Сжатие изображений...";
-
         const payload = { target_email: email, shop_name: shopName };
-        const files = document.querySelectorAll('.photo-file');
-        let hasFiles = false;
+        const inputFields = document.querySelectorAll('.photo-file');
+
+        // Считаем общее кол-во файлов
+        let totalFilesToProcess = 0;
+        inputFields.forEach(input => totalFilesToProcess += input.files.length);
+
+        if (totalFilesToProcess === 0) {
+            alert("Выберите хотя бы одно фото!");
+            btn.disabled = false;
+            return;
+        }
+        if (totalFilesToProcess > 30) {
+            alert("Максимально можно отправить 30 фото. У вас выбрано: " + totalFilesToProcess);
+            btn.disabled = false;
+            return;
+        }
 
         try {
-            for (let i = 0; i < files.length; i++) {
-                if (files[i].files[0]) {
-                    const compressed = await imageCompression(files[i].files[0], { maxSizeMB: 0.8, maxWidthOrHeight: 1280 });
-                    payload[`file${i}`] = await imageCompression.getDataUrlFromFile(compressed);
-                    hasFiles = true;
+            let processedCount = 0;
+            for (let i = 0; i < inputFields.length; i++) {
+                const files = inputFields[i].files;
+                for (let j = 0; j < files.length; j++) {
+                    processedCount++;
+                    status.innerHTML = `Обработка фото ${processedCount} из ${totalFilesToProcess}...<br><small>Пожалуйста, подождите</small>`;
+
+                    // Сжимаем до 0.6МБ для запаса под лимит Gmail
+                    const compressed = await imageCompression(files[j], {
+                        maxSizeMB: 0.6,
+                        maxWidthOrHeight: 1200,
+                        useWebWorker: true
+                    });
+                    const base64 = await imageCompression.getDataUrlFromFile(compressed);
+                    payload[`f${i}_${j}`] = base64;
                 }
             }
 
-            if (!hasFiles) throw "Выберите хотя бы одно фото!";
-
-            status.innerText = "Отправка на почту...";
+            status.innerHTML = `Отправка ${totalFilesToProcess} фото...<br><small>Это может занять до минуты</small>`;
             const response = await fetch(`${SERVER_URL}/send`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -191,7 +185,8 @@
                 alert("Отчет успешно отправлен!");
                 location.reload();
             } else {
-                throw "Ошибка сервера. Проверьте логи.";
+                const err = await response.json();
+                throw "Ошибка сервера: " + (err.message || "попробуйте меньше фото");
             }
         } catch (err) {
             alert(err);
