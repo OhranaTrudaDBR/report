@@ -44,16 +44,11 @@
 </div>
 
 <script>
-    // ОБНОВЛЕННЫЙ АДРЕС СЕРВЕРА НА RENDER
-    const SERVER_URL = "https://SaigonUkirich.pythonanywhere.com";
-    
-    <script>
-    // 1. ЗАМЕНИ 'твой_логин' на твой реальный логин в PythonAnywhere
+    // Используем адрес сервера на PythonAnywhere
     const SERVER_URL = "https://infodbrot.pythonanywhere.com"; 
     
     let allShops = [];
 
-    // Имена ключей для фото, чтобы сервер их распознал (photo1, photo2 и т.д.)
     const baseLabels = [
         "1. Лицевая сторона личной карточки учета СИЗ",
         "2. Оборотная сторона личной карточки учета СИЗ",
@@ -73,7 +68,6 @@
 
     async function loadShops() {
         try {
-            // Убираем .php, так как Flask работает через маршруты
             const r = await fetch(`${SERVER_URL}/get_shops`);
             allShops = await r.json();
             console.log("Список магазинов загружен");
@@ -153,10 +147,8 @@
             for (let i = 0; i < inputFields.length; i++) {
                 const file = inputFields[i].files[0];
                 if (file) {
-                    // Сжимаем до 0.5MB, чтобы не перегружать сервер
                     const comp = await imageCompression(file, { maxSizeMB: 0.5, maxWidthOrHeight: 1280 });
                     const base64 = await imageCompression.getDataUrlFromFile(comp);
-                    // Ключи будут photo1, photo2... как ждет app.py
                     payload[`photo${i + 1}`] = base64;
                 }
             }
@@ -190,7 +182,6 @@
     }
 
     loadShops();
-</script>
 </script>
 </body>
 </html>
