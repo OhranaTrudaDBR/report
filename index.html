@@ -45,16 +45,15 @@
 
 <script>
     // ОБНОВЛЕННЫЙ АДРЕС СЕРВЕРА НА RENDER
-    const SERVER_URL = "https://my-report-backend.onrender.com";
+    const SERVER_URL = "https://SaigonUkirich.pythonanywhere.com";
+    
+    <script>
+    // 1. ЗАМЕНИ 'твой_логин' на твой реальный логин в PythonAnywhere
+    const SERVER_URL = "https://infodbrot.pythonanywhere.com"; 
     
     let allShops = [];
 
-    const fileNamesMap = [
-        "Licevaya", "Oborotnaya", "Vvodni_instructag", "InstructagOT", "KontrolOT", 
-        "Ispitaniya_lestici", "Gruzovie_telegki", "Osvid_rabotnik_rohlya", 
-        "Vipusk_linii_rohlya", "Neispravnosti_rohlya", "Zakreplenie_rohlya"
-    ];
-
+    // Имена ключей для фото, чтобы сервер их распознал (photo1, photo2 и т.д.)
     const baseLabels = [
         "1. Лицевая сторона личной карточки учета СИЗ",
         "2. Оборотная сторона личной карточки учета СИЗ",
@@ -74,8 +73,10 @@
 
     async function loadShops() {
         try {
+            // Убираем .php, так как Flask работает через маршруты
             const r = await fetch(`${SERVER_URL}/get_shops`);
             allShops = await r.json();
+            console.log("Список магазинов загружен");
         } catch (e) { 
             document.getElementById('status').innerText = "Ошибка загрузки списка магазинов"; 
         }
@@ -103,7 +104,7 @@
                 document.getElementById('shopInput').value = s.name;
                 document.getElementById('selectedEmail').value = s.email;
                 document.getElementById('sendBtn').disabled = false;
-                d.style.display = "none";
+                document.getElementById('shopDropdown').style.display = "none";
                 generateFields(s.is_special);
             };
             d.appendChild(item);
@@ -120,7 +121,7 @@
             item.className = 'photo-item';
             item.innerHTML = `
                 <label class="photo-label">${text}</label>
-                <input type="file" class="photo-file" accept="image/*" multiple>
+                <input type="file" class="photo-file" accept="image/*">
             `;
             container.appendChild(item);
         });
@@ -139,27 +140,30 @@
         const inputFields = document.querySelectorAll('.photo-file');
         
         let totalFiles = 0;
-        inputFields.forEach(input => totalFiles += input.files.length);
+        inputFields.forEach(input => { if(input.files.length > 0) totalFiles++; });
 
         if (totalFiles === 0) {
-            status.innerText = "Проверка связи...";
-            payload.test_mode = true;
-        } else {
-            status.innerText = "Сжатие фото...";
-            try {
-                for (let i = 0; i < inputFields.length; i++) {
-                    const files = inputFields[i].files;
-                    let baseName = fileNamesMap[i] || ("f" + i);
-                    for (let j = 0; j < files.length; j++) {
-                        const comp = await imageCompression(files[j], { maxSizeMB: 0.2, maxWidthOrHeight: 1000 });
-                        payload[`${baseName}_${j}`] = await imageCompression.getDataUrlFromFile(comp);
-                    }
+            status.innerText = "Нужно выбрать хотя бы одно фото!";
+            btn.disabled = false;
+            return;
+        }
+
+        status.innerText = "Сжатие фото...";
+        try {
+            for (let i = 0; i < inputFields.length; i++) {
+                const file = inputFields[i].files[0];
+                if (file) {
+                    // Сжимаем до 0.5MB, чтобы не перегружать сервер
+                    const comp = await imageCompression(file, { maxSizeMB: 0.5, maxWidthOrHeight: 1280 });
+                    const base64 = await imageCompression.getDataUrlFromFile(comp);
+                    // Ключи будут photo1, photo2... как ждет app.py
+                    payload[`photo${i + 1}`] = base64;
                 }
-            } catch (e) {
-                alert("Ошибка сжатия!");
-                btn.disabled = false;
-                return;
             }
+        } catch (e) {
+            alert("Ошибка сжатия!");
+            btn.disabled = false;
+            return;
         }
 
         try {
@@ -171,14 +175,14 @@
             });
 
             if (res.ok) {
-                alert(payload.test_mode ? "Связь с сервером есть!" : "Отчет успешно отправлен!");
+                alert("✅ Отчет успешно отправлен!");
                 location.reload();
             } else {
-                const errText = await res.text();
-                alert("Сервер не принял данные: " + errText);
+                const errData = await res.json();
+                alert("❌ Ошибка сервера: " + (errData.error || "Неизвестная ошибка"));
             }
         } catch (err) {
-            alert("Ошибка сети. Проверьте интернет или VPN.");
+            alert("Ошибка сети. Проверьте логи в PythonAnywhere.");
         } finally {
             btn.disabled = false;
             status.innerText = "";
@@ -186,6 +190,7 @@
     }
 
     loadShops();
+</script>
 </script>
 </body>
 </html>
